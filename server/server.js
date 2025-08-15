@@ -5,7 +5,7 @@ var cookieParser = require('cookie-parser')
 const morgan = require('morgan');
 const { exec } = require('child_process');
 const app = express();
-const port = 5100;
+const port = 5699;
 
 app.use(cookieParser())
 
@@ -30,7 +30,7 @@ app.use(session({
   }
 }));
 
-app.use('/aaa', express.static('/var/www/aaa/client'))
+app.use('/aaa', express.static('/var/www/aaa'))
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -172,7 +172,7 @@ app.get('/events', (req, res) => {
     clients.push(res);
 });
 
-app.listen(5100, () => console.log('Server started on port 5100'));
+app.listen(5699, () => console.log('Server started on port 5699'));
 
 app.get('/aaa/getInitiatorState', (req, res) => {
     res.send(req.session.isProcessInitiator || false);
