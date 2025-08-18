@@ -39,6 +39,6 @@ if [ "$PLATFORM" == "mac" ]; then
 elif [ "$PLATFORM" == "linux" ]; then
     OUTPUT_PATH="${WORKING_PATH}"
 fi
-# scp acdc@$IP:$OUTPUT_PATH/${OUTPUT_FILE} /scratch/app-assembler-downloads
+scp acdc@$IP:$OUTPUT_PATH/${OUTPUT_FILE} /scratch/app-assembler-downloads
 
 kill -s SIGUSR1 $$

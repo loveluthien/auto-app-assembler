@@ -85,19 +85,6 @@ async function sortBranches(data, branchContainerId, branchType) {
 fetchCommits('carta-frontend').then(data => displayCommits(data.reverse(), 'frontend-branch', 'frontend-branch'));
 fetchCommits('carta-backend').then(data => displayCommits(data.reverse(), 'backend-branch', 'backend-branch'));
 
-// Show non-sorted branch list by default
-//fetchBranches('https://api.github.com/repos/CARTAvis/carta-frontend/branches?per_page=100').then(data => displayBranches(data, 'frontend-branch', 'frontend-branch'));
-//fetchBranches('https://api.github.com/repos/CARTAvis/carta-backend/branches?per_page=100').then(data => displayBranches(data, 'backend-branch', 'backend-branch'));
-
-// Show the sorted branches if the buttons are pressed
-document.getElementById('frontend-sort-button').addEventListener('click', () => {
-    fetchBranches('https://api.github.com/repos/CARTAvis/carta-frontend/branches?per_page=100').then(data => sortBranches(data, 'frontend-branch', 'frontend-branch'));
-});
-document.getElementById('backend-sort-button').addEventListener('click', () => {
-    fetchBranches('https://api.github.com/repos/CARTAvis/carta-backend/branches?per_page=100').then(data => sortBranches(data, 'backend-branch', 'backend-branch'));
-});
-
-
 // Button that will send the branch names to be built
 $(document).ready(function() {
 
@@ -109,18 +96,29 @@ $(document).ready(function() {
 
 function generateScript(platform, arch) {
     console.log('Button clicked');
-    const frontendBranch = $('#frontend-branch').val();
-    const backendBranch = $('#backend-branch').val();
+    const frontendSelect = document.getElementById('frontend-branch');
+    const backendSelect = document.getElementById('backend-branch');
+    const frontendBranch = frontendSelect.options[frontendSelect.selectedIndex]?.text.split(' ')[0];
+    const backendBranch = backendSelect.options[backendSelect.selectedIndex]?.text.split(' ')[0];
+    const frontendCommit = frontendSelect.value;
+    const backendCommit = backendSelect.value;
     // Make sure both branches are selected before clicking a button
     if (!frontendBranch || !backendBranch) {
         console.log('Both branches need to be selected first.');
         return;
     }
     isProcessInitiator = true;
-    console.log('Frontend branch:', frontendBranch);
-    console.log('Backend branch:', backendBranch);
+    console.log('Frontend branch:', frontendBranch, 'commit:', frontendCommit);
+    console.log('Backend branch:', backendBranch, 'commit:', backendCommit);
     $('#buildOverlay').show();
-    $.post('/aaa/generate', {platform, arch, frontendBranch, backendBranch }, (res) => {
+    $.post('/aaa/generate', {
+        platform,
+        arch,
+        frontendBranch,
+        backendBranch,
+        frontendCommit,
+        backendCommit
+    }, (res) => {
         console.log('Response:', res);
     }).fail(function(jqXHR, textStatus, errorThrown) {
         if (jqXHR.status === 429) {
