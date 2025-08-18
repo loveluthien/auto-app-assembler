@@ -12,16 +12,16 @@ if [ "$PLATFORM" != "mac" ] && [ "$PLATFORM" != "linux" ]; then
 fi
 
 if [ "$PLATFORM" == "mac" ]; then
-    HOME_PATH="/Users/acdc"
+    WORKING_PATH="/Users/acdc/aaa_package"
 elif [ "$PLATFORM" == "linux" ]; then
-    HOME_PATH="/home/acdc"
+    WORKING_PATH="/home/acdc/aaa_package"
 fi
 
 # Grep IP from machine_config. Notice that $2 in awk '{print $2}' is nothing to do with $ARCH
-IP=$(grep $PLATFORM-$ARCH ./machine_config | awk '{print $2}')
+IP=$(grep $PLATFORM_$ARCH ./machine_config | awk '{print $2}')
 
 CONFIG_EDITOR=edit_${PLATFORM}_config.sh
-ssh acdc@$IP "${HOME_PATH}/aaa_package/$CONFIG_EDITOR --frontend $FRONTEND --backend $BACKEND" > log
+ssh acdc@$IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --frontend $FRONTEND --backend $BACKEND" > log
 
 # If log contains "Error" then stop program
 if grep -q "Error" log; then
@@ -30,14 +30,14 @@ if grep -q "Error" log; then
 fi
 
 # Run packaging script
-ssh acdc@$IP "${HOME_PATH}/aaa_package/run_pack.sh" >> log
+ssh acdc@$IP "cd ${WORKING_PATH} && ./run_pack.sh" >> log
 
 # Extract Output file name in log and copy it to carta server
 OUTPUT_FILE=$(grep "Output file:" log | awk '{print $NF}')
 if [ "$PLATFORM" == "mac" ]; then
-    OUTPUT_PATH="${HOME_PATH}/aaa_package/pack/dist"
+    OUTPUT_PATH="${WORKING_PATH}/pack/dist"
 elif [ "$PLATFORM" == "linux" ]; then
-    OUTPUT_PATH="${HOME_PATH}/aaa_package"
+    OUTPUT_PATH="${WORKING_PATH}"
 fi
 # scp acdc@$IP:$OUTPUT_PATH/${OUTPUT_FILE} /scratch/app-assembler-downloads
 
