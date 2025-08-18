@@ -6,35 +6,22 @@ async function fetchCommits(repo) {
     return data;
 }
 
-function displayCommits(data, commitContainerId, commitType) {
-    const commitContainer = document.getElementById(commitContainerId);
-    commitContainer.innerHTML = ''; // clear previous contents
-    for (let i = 0; i < data.length; i++) {
-        const radioButton = document.createElement('input');
-        radioButton.type = 'radio';
-        radioButton.name = commitType;
-        radioButton.value = data[i].shortId;
-        radioButton.id = commitType + '-' + i;
-        commitContainer.appendChild(radioButton);
-
-        const label = document.createElement('label');
-        label.htmlFor = commitType + '-' + i;
-
-        // Format the date and time as a string
+function displayCommits(data, selectId, commitType) {
+    const select = document.getElementById(selectId);
+    select.innerHTML = '';
+    data.forEach((item, i) => {
         let datePart = '';
         let timePart = '';
-        if (data[i].timestamp) {
-            const dateStr = new Date(data[i].timestamp).toISOString();
+        if (item.timestamp) {
+            const dateStr = new Date(item.timestamp).toISOString();
             datePart = dateStr.split('T')[0];
             timePart = dateStr.split('T')[1].split('.')[0];
         }
-
-        // show branch name, date, time, and short commit ID
-        label.appendChild(document.createTextNode(`${data[i].branch}  ${datePart} ${timePart} (${data[i].shortId})`));
-        commitContainer.appendChild(label);
-
-        commitContainer.appendChild(document.createElement('br'));
-    }
+        const option = document.createElement('option');
+        option.value = item.shortId;
+        option.text = `${item.branch}  ${datePart} ${timePart} (${item.shortId})`;
+        select.appendChild(option);
+    });
 }
 
 
@@ -63,33 +50,20 @@ async function fetchBranches(url) {
     return data;
 }
 
-function displayBranches(data, branchContainerId, branchType) {
-    const branchContainer = document.getElementById(branchContainerId);
-    branchContainer.innerHTML = ''; // clear previous contents
-    for (let i = 0; i < data.length; i++) {
-        const radioButton = document.createElement('input');
-        radioButton.type = 'radio';
-        radioButton.name = branchType;
-        radioButton.value = data[i].commit.sha.substring(0, 8);  // use the short commit ID
-        radioButton.id = branchType + '-' + i;
-        branchContainer.appendChild(radioButton);
-
-        const label = document.createElement('label');
-        label.htmlFor = branchType + '-' + i;
-        
-        // Format the date and time as a string
+function displayBranches(data, selectId, branchType) {
+    const select = document.getElementById(selectId);
+    select.innerHTML = '';
+    data.forEach((item, i) => {
         let datePart = '';
-        if (data[i].commit.date) {
-            const dateStr = data[i].commit.date.toISOString();
+        if (item.commit.date) {
+            const dateStr = item.commit.date.toISOString();
             datePart = dateStr.split('T')[0];
         }
-
-        // show branch name, date, and short commit ID
-        label.appendChild(document.createTextNode(`${data[i].name}  ${datePart}  (${data[i].commit.sha.substring(0, 8)})`));
-        branchContainer.appendChild(label);
-
-        branchContainer.appendChild(document.createElement('br'));
-    }
+        const option = document.createElement('option');
+        option.value = item.commit.sha.substring(0, 8);
+        option.text = `${item.name}  ${datePart}  (${item.commit.sha.substring(0, 8)})`;
+        select.appendChild(option);
+    });
 }
 
 async function sortBranches(data, branchContainerId, branchType) {
@@ -135,21 +109,17 @@ $(document).ready(function() {
 
 function generateScript(platform, arch) {
     console.log('Button clicked');
-    const frontendBranch = $('input[name="frontend-branch"]:checked').val();
-    const backendBranch = $('input[name="backend-branch"]:checked').val();
-    
+    const frontendBranch = $('#frontend-branch').val();
+    const backendBranch = $('#backend-branch').val();
     // Make sure both branches are selected before clicking a button
-    if (frontendBranch === undefined || backendBranch === undefined) {
+    if (!frontendBranch || !backendBranch) {
         console.log('Both branches need to be selected first.');
         return;
     }
-
     isProcessInitiator = true;
     console.log('Frontend branch:', frontendBranch);
     console.log('Backend branch:', backendBranch);
-
     $('#buildOverlay').show();
-
     $.post('/aaa/generate', {platform, arch, frontendBranch, backendBranch }, (res) => {
         console.log('Response:', res);
     }).fail(function(jqXHR, textStatus, errorThrown) {
@@ -173,10 +143,10 @@ const eventSource = new EventSource('/events');
         console.log(`Received event: ${event.data}`); // debugging
         switch(event.data) {
             case 'bashScriptStarted':
-              if (!isProcessInitiator) {           // Show the busyOverlay to clients that did not initiate the build process
-                  $('#busyOverlay').show();
-              }
-              break;
+                if (!isProcessInitiator) { // Show the busyOverlay to clients that did not initiate the build process
+                    $('#busyOverlay').show();
+                }
+                break;
             case 'bashScriptFinished':
                 console.log('Hiding overlays');
                 $('#buildOverlay').hide();

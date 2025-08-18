@@ -1,0 +1,210 @@
+body, h1, h2, p, a {
+  font-family: Arial;
+}
+
+body.dark-theme {
+  background-color: #181a1b;
+  color: #e0e0e0;
+}
+body.light-theme {
+  background-color: #f5f5f5;
+  color: #222;
+}
+
+.dark-theme .section, .dark-theme .vertical-menu {
+  background-color: #181a1b !important;
+  color: #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.light-theme .section, .light-theme .vertical-menu {
+  background-color: #eee !important;
+  color: #222;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.dark-theme select, .dark-theme #frontend-branch, .dark-theme #backend-branch, .dark-theme #file-list {
+  background-color: #23272a !important;
+  color: #e0e0e0;
+  border: 1px solid #444;
+}
+.light-theme select, .light-theme #frontend-branch, .light-theme #backend-branch, .light-theme #file-list {
+  background-color: #f5f5f5 !important;
+  color: #222;
+  border: 1px solid #bbb;
+}
+
+.dark-theme button, .dark-theme .blue-background, .dark-theme .sort-button {
+  background-color: #2c2f34 !important;
+  color: #e0e0e0 !important;
+  border: 1px solid #444;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+.dark-theme button:hover, .dark-theme .blue-background:hover, .dark-theme .sort-button:hover {
+  background-color: #444 !important;
+}
+.light-theme button, .light-theme .blue-background, .light-theme .sort-button {
+  background-color: #e0e0e0 !important;
+  color: #222 !important;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+.light-theme button:hover, .light-theme .blue-background:hover, .light-theme .sort-button:hover {
+  background-color: #ccc !important;
+}
+
+.dark-theme h2 {
+    background-color: #1976d2;
+  
+  color: #fff;
+}
+.light-theme h2 {
+  background-color: #003973;
+  color: #fff;
+}
+
+.dark-theme a {
+  color: #7abaff;
+}
+.dark-theme a:hover {
+  color: #a3d8ff;
+}
+.light-theme a {
+  color: #1976d2;
+}
+.light-theme a:hover {
+  color: #003973;
+}
+
+.dark-theme #buildOverlay, .dark-theme #busyOverlay {
+  background-color: rgba(0,0,0,0.7);
+}
+.light-theme #buildOverlay, .light-theme #busyOverlay {
+  background-color: rgba(255,255,255,0.7);
+}
+
+.dark-theme #overlayText {
+  color: #fff;
+}
+.light-theme #overlayText {
+  color: #222;
+}
+.loader {
+  border: 16px solid #f3f3f3;
+  border-top: 16px solid #3498db;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 2s linear infinite;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.header-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+}
+.header-container .imgbox {
+  flex: 1;
+  text-align: left;
+}
+.header-container .imgbox img {
+  max-width: 100px;
+  max-height: 100px;
+}
+.header-container .header_title {
+  flex: 3;
+  text-align: left;
+}
+.vertical-menu a {
+  background-color: #eee;
+  color:black;
+  display: block;
+  padding: 10px;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+   margin-top: 10px;
+}
+.vertical-menu a:hover {
+  background-color: #ccc;
+}
+.blue-background {
+  background-color: #eee;
+}
+.selected-branch {
+  background-color: #ccc;
+}
+.section {
+  display: flex;
+  flex-direction: column;
+  background-color: #ffffff;
+}
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.sort-button {
+  margin-left: auto;
+}
+.blue-background {
+  background-color: #eee;
+  color:black;
+  padding: 10px;
+  text-decoration: none;
+}
+.blue-background:hover {
+  background-color: #ccc;
+}
+h2 {
+  background-color: #003973;
+  color: white;
+  padding: 5px;
+}
+#frontend-branch, #backend-branch, #file-list {
+  background-color: #eee;
+}
+#buildOverlay {
+  display: none;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0,0,0,0.5);
+  z-index: 2;
+  cursor: pointer;
+}
+#busyOverlay {
+  display: none;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0,0,0,0.5);
+  z-index: 2;
+  cursor: pointer;
+}
+#overlayText {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-size: 50px;
+  color: white;
+  transform: translate(-50%,-50%);
+  -ms-transform: translate(-50%,-50%);
+}

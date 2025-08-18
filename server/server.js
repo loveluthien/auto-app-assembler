@@ -10,8 +10,8 @@ const port = 5699;
 app.use(cookieParser())
 
 app.get('/', function(req, res) {
-  console.log('Cookies: ', req.cookies)
-})
+    console.log('Cookies: ', req.cookies)
+});
 
 const { spawn } = require('child_process');
 
