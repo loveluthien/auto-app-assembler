@@ -3,7 +3,7 @@ const path = require('path');
 const express = require('express');
 var cookieParser = require('cookie-parser')
 const morgan = require('morgan');
-const { exec } = require('child_process');
+// const { exec } = require('child_process');
 const app = express();
 const port = 5699;
 
@@ -20,14 +20,14 @@ const logStream = fs.createWriteStream('/tmp/app-assembler.log', {flags: 'a'});
 const session = require('express-session');
 
 app.use(session({
-  secret: '<token>',
-  resave: false,
-  saveUninitialized: true,
-  store: new session.MemoryStore(),
-  cookie: {
+    secret: '<token>',
+    resave: false,
+    saveUninitialized: true,
+    store: new session.MemoryStore(),
+    cookie: {
         sameSite: 'none',
         secure: true, 
-  }
+    }
 }));
 
 app.use('/aaa', express.static('/var/www/aaa'))
@@ -84,9 +84,9 @@ app.get('/commits/:repo', (req, res) => {
         let lines = data.toString().split('\n').filter(Boolean);
 //        let commits = lines.length ? lines.map(JSON.parse) : [];
         let commits = lines.length ? lines.map(line => {
-           let commit = JSON.parse(line);
-           commit.timestamp = new Date(commit.timestamp);
-           return commit;
+            let commit = JSON.parse(line);
+            commit.timestamp = new Date(commit.timestamp);
+            return commit;
         }) : [];
 
         res.json(commits);
@@ -97,7 +97,6 @@ app.get('/commits/:repo', (req, res) => {
 let clients = [];
 
 let scriptRunnerSessionId = null;
-
 app.post('/aaa/generate', (req, res) => {
     const sessionId = req.session.id;
     req.session.isProcessInitiator = true;
@@ -106,16 +105,17 @@ app.post('/aaa/generate', (req, res) => {
     const userIP = req.headers['x-forwarded-for'] || req.ip;
     const frontendBranch = req.body.frontendBranch;
     const backendBranch = req.body.backendBranch;
-    const scriptName = req.body.scriptName;
-    console.log(time, userIP, scriptName, frontendBranch, backendBranch);
+    const platform = req.body.platform || 'linux'; // Default to linux if not provided
+    const arch = req.body.arch || 'x64'; // Default to x64 if not provided
 
-    logStream.write(`${time} ${userIP} ${frontendBranch} ${backendBranch}\n`);
+    logStream.write(`${time} ${userIP} create-carta.sh ${platform} ${arch} ${frontendBranch} ${backendBranch}\n`);
 
     if (!scriptRunnerSessionId) {
         scriptRunnerSessionId = sessionId;
         console.log(`Set scriptRunnerSessionId to ${sessionId}`);
 
-        const child = spawn('bash', [`./${scriptName}`, frontendBranch, backendBranch]);
+        const scriptPath = path.join(__dirname, 'create-carta.sh');
+        const child = spawn('bash', [scriptPath, platform, arch, frontendBranch, backendBranch]);
 
         // Notify clients that the bash script started
         clients.forEach((clientRes) => {
@@ -131,34 +131,39 @@ app.post('/aaa/generate', (req, res) => {
         });
 
         child.stderr.on('data', (data) => {
+            console.error(`STDERR: ${data}`);
             logStream.write(`STDERR: ${data}`);
         });
 
         child.on('error', (error) => {
+            console.error('Failed to start script:', error);
             logStream.write(`ERROR: ${error}`);
-            res.status(500).send(error);
+            // Only send a response if it hasn't been sent yet
+            if (!res.headersSent) {
+                res.status(500).send(error.message || 'Script error');
+            }
         });
 
-    child.on('exit', (code, signal) => {
-        if (signal === 'SIGUSR1') {
-            // Handle successful execution
-            scriptRunnerSessionId = null;
-            clients.forEach((clientRes) => {
-                clientRes.write(`data: bashScriptFinished\n\n`);
-            });
-        } else {
-            // Handle errors or other signals
-            logStream.write(`Process exited with code: ${code}`);
-            res.status(500).send(`Process exited with code: ${code}`);
-        }
-    });
-    // Send a response indicating the script started successfully
-    res.send('Script started');
-      } else {
-       res.status(429).send('A script is already running');
+        child.on('exit', (code, signal) => {
+            if (signal === 'SIGUSR1') {
+                // Handle successful execution
+                scriptRunnerSessionId = null;
+                clients.forEach((clientRes) => {
+                    clientRes.write(`data: bashScriptFinished\n\n`);
+                });
+            } else {
+                // Handle errors or other signals
+                logStream.write(`Process exited with code: ${code}`);
+                // Do NOT send another response here!
+            }
+        });
+
+        // Send a response indicating the script started successfully
+        res.send('Script started');
+    } else {
+        res.status(429).send('A script is already running');
     }
 });
-
 
 app.get('/events', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
@@ -172,7 +177,7 @@ app.get('/events', (req, res) => {
     clients.push(res);
 });
 
-app.listen(5699, () => console.log('Server started on port 5699'));
+app.listen(port, () => console.log('Server started on port 5699'));
 
 app.get('/aaa/getInitiatorState', (req, res) => {
     res.send(req.session.isProcessInitiator || false);
@@ -189,7 +194,7 @@ app.get('/downloads', (req, res) => {
 });
 
 app.get('/', function(req, res) {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 

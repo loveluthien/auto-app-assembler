@@ -133,7 +133,7 @@ $(document).ready(function() {
 
   let isProcessInitiator = false;
 
-function generateScript(scriptName) {
+function generateScript(platform, arch) {
     console.log('Button clicked');
     const frontendBranch = $('input[name="frontend-branch"]:checked').val();
     const backendBranch = $('input[name="backend-branch"]:checked').val();
@@ -150,7 +150,7 @@ function generateScript(scriptName) {
 
     $('#buildOverlay').show();
 
-    $.post('/aaa/generate', { scriptName, frontendBranch, backendBranch }, (res) => {
+    $.post('/aaa/generate', {platform, arch, frontendBranch, backendBranch }, (res) => {
         console.log('Response:', res);
     }).fail(function(jqXHR, textStatus, errorThrown) {
         if (jqXHR.status === 429) {
@@ -162,9 +162,10 @@ function generateScript(scriptName) {
     });
 }
 
-$('#generate-button-linux').click(() => generateScript('create-carta-appimage.sh'));
-$('#generate-button-macos-arm64').click(() => generateScript('create-carta-macos-arm64.sh'));
-$('#generate-button-macos-x64').click(() => generateScript('create-carta-macos-x64.sh'));
+// $('#generate-button-linux-arm64').click(() => generateScript("linux", "arm64"));
+$('#generate-button-linux-x64').click(() => generateScript("linux", "x64"));
+$('#generate-button-macos-arm64').click(() => generateScript("mac", "arm64"));
+$('#generate-button-macos-x64').click(() => generateScript("mac", "x64"));
 
 const eventSource = new EventSource('/events');
 
@@ -194,18 +195,6 @@ const eventSource = new EventSource('/events');
                 break;
         }
     };
-
-// Keep the download list up to date
-//function updateFileList() {
-//    $.get('/downloads', (files) => {
-//        const fileList = $('#file-list');
-//        fileList.empty();
-//        files.forEach((file) => {
-//            fileList.append(`<li><a href="/downloads/${encodeURIComponent(file)}">${file}</a></li>`);
-////            fileList.append(`<li><a href="/scratch/appimage-assembler-downloads/${encodeURIComponent(file)}">${file}</a></li>`);
-//        });
-//    });
-//}
 
 // Sort by date
 function updateFileList() {
