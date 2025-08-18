@@ -6,14 +6,14 @@ FRONTEND=$3
 BACKEND=$4
 
 # Check platform
-if [ $PLATFORM != "mac" ] && [ $PLATFORM != "linux" ]; then
+if [ "$PLATFORM" != "mac" ] && [ "$PLATFORM" != "linux" ]; then
     echo "Invalid platform: $PLATFORM"
     exit 1
 fi
 
-if [ $PLATFORM == "mac" ]; then
+if [ "$PLATFORM" == "mac" ]; then
     HOME_PATH="/Users/acdc"
-elif [ $PLATFORM == "linux" ]; then
+elif [ "$PLATFORM" == "linux" ]; then
     HOME_PATH="/home/acdc"
 fi
 
@@ -34,9 +34,9 @@ ssh acdc@$IP "${HOME_PATH}/aaa_package/run_pack.sh" >> log
 
 # Extract Output file name in log and copy it to carta server
 OUTPUT_FILE=$(grep "Output file:" log | awk '{print $NF}')
-if [ $PLATFORM == "mac" ]; then
+if [ "$PLATFORM" == "mac" ]; then
     OUTPUT_PATH="${HOME_PATH}/aaa_package/pack/dist"
-elif [ $PLATFORM == "linux" ]; then
+elif [ "$PLATFORM" == "linux" ]; then
     OUTPUT_PATH="${HOME_PATH}/aaa_package"
 fi
 # scp acdc@$IP:$OUTPUT_PATH/${OUTPUT_FILE} /scratch/app-assembler-downloads
