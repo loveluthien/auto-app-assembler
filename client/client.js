@@ -170,16 +170,16 @@ function updateFileList() {
         const fileList = $('#file-list');
         fileList.empty();
 
-        files.sort((a, b) => {
-            // Extract the date string from the file names
-            const dateA = a.match(/\d{4}-\d{2}-\d{2}/)[0];
-            const dateB = b.match(/\d{4}-\d{2}-\d{2}/)[0];
-
-            if (dateA && dateB) {
-                // Return the comparison result
+            files.sort((a, b) => {
+                const matchA = a.match(/\d{4}-\d{2}-\d{2}/);
+                const matchB = b.match(/\d{4}-\d{2}-\d{2}/);
+                if (!matchA && !matchB) return 0;
+                if (!matchA) return 1;
+                if (!matchB) return -1;
+                const dateA = matchA[0];
+                const dateB = matchB[0];
                 return new Date(dateB) - new Date(dateA);
-            }
-        });
+            });
 
         files.forEach((file) => {
             fileList.append(`<li><a href="/downloads/${encodeURIComponent(file)}">${file}</a></li>`);
