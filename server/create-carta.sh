@@ -20,6 +20,13 @@ fi
 # Grep IP from machine_config. Notice that $2 in awk '{print $2}' is nothing to do with $ARCH
 IP=$(grep $PLATFORM_$ARCH ./machine_config | awk '{print $2}')
 
+# if IP is empty then stop program
+if [ -z "$IP" ]; then
+    echo "Machine (IP) for packaging $PLATFORM_$ARCH is not set."
+    echo "Please check your machine_config file."
+    exit 1
+fi
+
 CONFIG_EDITOR=edit_${PLATFORM}_config.sh
 ssh acdc@$IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --frontend $FRONTEND --backend $BACKEND" > log
 

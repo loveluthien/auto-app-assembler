@@ -103,19 +103,19 @@ app.post('/aaa/generate', (req, res) => {
     console.log(`Received script generation request from session ${sessionId}`);
     const time = new Date();
     const userIP = req.headers['x-forwarded-for'] || req.ip;
-    const frontendBranch = req.body.frontendBranch;
-    const backendBranch = req.body.backendBranch;
+    const frontendCommit = req.body.frontendCommit;
+    const backendCommit = req.body.backendCommit;
     const platform = req.body.platform || 'linux'; // Default to linux if not provided
     const arch = req.body.arch || 'x64'; // Default to x64 if not provided
 
-    logStream.write(`${time} ${userIP} create-carta.sh ${platform} ${arch} ${frontendBranch} ${backendBranch}\n`);
+    logStream.write(`${time} ${userIP} create-carta.sh ${platform} ${arch} ${frontendCommit} ${backendCommit}\n`);
 
     if (!scriptRunnerSessionId) {
         scriptRunnerSessionId = sessionId;
         console.log(`Set scriptRunnerSessionId to ${sessionId}`);
 
         const scriptPath = path.join(__dirname, 'create-carta.sh');
-        const child = spawn('bash', [scriptPath, platform, arch, frontendBranch, backendBranch]);
+        const child = spawn('bash', [scriptPath, platform, arch, frontendCommit, backendCommit]);
 
         // Notify clients that the bash script started
         clients.forEach((clientRes) => {

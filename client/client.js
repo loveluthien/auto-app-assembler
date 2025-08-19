@@ -175,8 +175,10 @@ function updateFileList() {
             const dateA = a.match(/\d{4}-\d{2}-\d{2}/)[0];
             const dateB = b.match(/\d{4}-\d{2}-\d{2}/)[0];
 
-            // Return the comparison result
-            return new Date(dateB) - new Date(dateA);
+            if (dateA && dateB) {
+                // Return the comparison result
+                return new Date(dateB) - new Date(dateA);
+            }
         });
 
         files.forEach((file) => {
