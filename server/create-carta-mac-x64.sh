@@ -11,6 +11,8 @@ if [ "$PLATFORM" != "mac" ]; then
     exit 1
 fi
 
+WORKING_PATH="/Users/acdc/aaa_package"
+
 ## Prepare backend
 # Grep IP from machine_config. Notice that $2 in awk '{print $2}' is nothing to do with $ARCH
 BACKEND_BUILD_IP=$(grep ${PLATFORM}_${ARCH} ./machine_config | awk '{print $2}')
@@ -39,7 +41,7 @@ IP=$(grep ${PLATFORM}_notarize ./machine_config | awk '{print $2}')
 
 # copy built backend to packaging machine
 ssh acdc@$IP "cd ${WORKING_PATH} && rm -rf carta-backend && mkdir -p carta-backend"
-scp -r acdc@$BACKEND_BUILD_IP:${WORKING_PATH}/carta-backend acdc@$IP:${WORKING_PATH}/carta-backend
+scp -r acdc@$BACKEND_BUILD_IP:${WORKING_PATH}/carta-backend acdc@$IP:${WORKING_PATH}
 
 # if IP is empty then stop program
 if [ -z "$IP" ]; then
