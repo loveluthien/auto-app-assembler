@@ -47,8 +47,8 @@ if [ -z "$IP" ]; then
 fi
 
 # copy built backend to packaging machine
-ssh acdc@$IP "cd ${WORKING_PATH} && rm -rf carta-backend && mkdir -p carta-backend"
-scp -r acdc@$BACKEND_BUILD_IP:${WORKING_PATH}/carta-backend acdc@$IP:${WORKING_PATH}
+ssh acdc@$IP "rm -rf ${WORKING_PATH}/carta-backend/build && mkdir -p ${WORKING_PATH}/carta-backend/build"
+scp -rq acdc@$BACKEND_BUILD_IP:${WORKING_PATH}/carta-backend/build acdc@$IP:${WORKING_PATH}/carta-backend
 
 ssh acdc@$IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --frontend $FRONTEND --backend $BACKEND --arch x64 --no_backend_build" >> log
 
