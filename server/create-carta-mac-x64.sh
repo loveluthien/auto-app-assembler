@@ -15,16 +15,16 @@ WORKING_PATH="/Users/acdc/aaa_package"
 
 ## Prepare backend
 # Grep IP from machine_config. Notice that $2 in awk '{print $2}' is nothing to do with $ARCH
-BACKEND_BUILD_IP=$(grep ${PLATFORM}_${ARCH} ./machine_config | awk '{print $2}')
+BACKEND_BUILD_IP=$(grep mac_x64 ./machine_config | awk '{print $2}')
 
 # if BACKEND_BUILD_IP is empty then stop program
 if [ -z "$BACKEND_BUILD_IP" ]; then
-    echo "Machine (IP) for packaging ${PLATFORM}_${ARCH} is not set."
+    echo "Machine (IP) for packaging mac_x64 is not set."
     echo "Please check your machine_config file."
     exit 1
 fi
 
-CONFIG_EDITOR=edit_${PLATFORM}_config.sh
+CONFIG_EDITOR=edit_mac_config.sh
 ssh acdc@$BACKEND_BUILD_IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --frontend $FRONTEND --backend $BACKEND" > log
 
 # If log contains "Error" then stop program
@@ -37,11 +37,11 @@ ssh acdc@$BACKEND_BUILD_IP "cd ${WORKING_PATH} && ./build_backend.sh" >> log
 
 
 ## Prepare frontend and do the packaging
-IP=$(grep ${PLATFORM}_notarize ./machine_config | awk '{print $2}')
+IP=$(grep mac_notarize ./machine_config | awk '{print $2}')
 
 # if IP is empty then stop program
 if [ -z "$IP" ]; then
-    echo "Machine (IP) for packaging ${PLATFORM}_notarize is not set."
+    echo "Machine (IP) for packaging mac_notarize is not set."
     echo "Please check your machine_config file."
     exit 1
 fi

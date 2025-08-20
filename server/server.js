@@ -108,13 +108,18 @@ app.post('/aaa/generate', (req, res) => {
     const platform = req.body.platform || 'linux'; // Default to linux if not provided
     const arch = req.body.arch || 'x64'; // Default to x64 if not provided
 
-    logStream.write(`${time} ${userIP} create-carta.sh ${platform} ${arch} ${frontendCommit} ${backendCommit}\n`);
+    let script = 'create-carta.sh'
+    if (platform === 'mac' && arch === 'x64') {
+        script = 'create-carta-mac-x64.sh';
+    }
+    
+    logStream.write(`${time} ${userIP} ${script} ${platform} ${arch} ${frontendCommit} ${backendCommit}\n`);
 
     if (!scriptRunnerSessionId) {
         scriptRunnerSessionId = sessionId;
         console.log(`Set scriptRunnerSessionId to ${sessionId}`);
 
-        const scriptPath = path.join(__dirname, 'create-carta.sh');
+        const scriptPath = path.join(__dirname, script);
         const child = spawn('bash', [scriptPath, platform, arch, frontendCommit, backendCommit]);
 
         // Notify clients that the bash script started
