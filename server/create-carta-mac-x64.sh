@@ -50,7 +50,7 @@ fi
 ssh acdc@$IP "cd ${WORKING_PATH} && rm -rf carta-backend && mkdir -p carta-backend"
 scp -r acdc@$BACKEND_BUILD_IP:${WORKING_PATH}/carta-backend acdc@$IP:${WORKING_PATH}
 
-ssh acdc@$IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --frontend $FRONTEND --backend $BACKEND --no_backend_build" >> log
+ssh acdc@$IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --frontend $FRONTEND --backend $BACKEND --arch x64 --no_backend_build" >> log
 
 # If log contains "Error" then stop program
 if grep -q "Error" log; then
