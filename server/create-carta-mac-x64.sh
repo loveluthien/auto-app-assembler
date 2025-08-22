@@ -61,6 +61,9 @@ fi
 # Run packaging script
 ssh acdc@$IP "cd ${WORKING_PATH} && ./run_pack.sh" >> log
 
+# Make dmg_config default
+ssh acdc@$IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --default" >> log
+
 # Extract Output file name in log and copy it to carta server
 OUTPUT_FILE=$(grep "Output file:" log | awk '{print $NF}')
 OUTPUT_PATH="${WORKING_PATH}/pack/dist"

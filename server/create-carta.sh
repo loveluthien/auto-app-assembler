@@ -13,8 +13,10 @@ fi
 
 if [ "$PLATFORM" == "mac" ]; then
     WORKING_PATH="/Users/acdc/aaa_package"
+    PACK_SCRIPT="run_pack.sh"
 elif [ "$PLATFORM" == "linux" ]; then
     WORKING_PATH="/home/acdc/aaa_package"
+    PACK_SCRIPT="run_docker_package.sh"
 fi
 
 # Grep IP from machine_config. Notice that $2 in awk '{print $2}' is nothing to do with $ARCH
@@ -37,7 +39,10 @@ if grep -q "Error" log; then
 fi
 
 # Run packaging script
-ssh acdc@$IP "cd ${WORKING_PATH} && ./run_pack.sh" >> log
+ssh acdc@$IP "cd ${WORKING_PATH} && ./$PACK_SCRIPT" >> log
+
+# Make dmg_config default
+ssh acdc@$IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --default" >> log
 
 # Extract Output file name in log and copy it to carta server
 OUTPUT_FILE=$(grep "Output file:" log | awk '{print $NF}')
