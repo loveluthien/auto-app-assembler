@@ -12,15 +12,14 @@ if [ "$PLATFORM" != "mac" ] && [ "$PLATFORM" != "linux" ]; then
 fi
 
 if [ "$PLATFORM" == "mac" ]; then
-    WORKING_PATH="/Users/acdc/aaa_package"
     PACK_SCRIPT="run_pack.sh"
 elif [ "$PLATFORM" == "linux" ]; then
-    WORKING_PATH="/home/acdc/aaa_package"
     PACK_SCRIPT="run_docker_package.sh"
 fi
 
 # Grep IP from machine_config. Notice that $2 in awk '{print $2}' is nothing to do with $ARCH
-IP=$(grep $PLATFORM_$ARCH ./machine_config | awk '{print $2}')
+IP=$(grep ${PLATFORM}_${ARCH} ./machine_config | awk '{print $2}')
+WORKING_PATH=`ssh acdc@$IP "echo $HOME/aaa_package"`
 
 # if IP is empty then stop program
 if [ -z "$IP" ]; then
