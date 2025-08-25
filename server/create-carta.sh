@@ -19,13 +19,13 @@ fi
 
 # Grep IP from machine_config. Notice that $2 in awk '{print $2}' is nothing to do with $ARCH
 IP=$(grep ${PLATFORM}_${ARCH} ./machine_config | awk '{print $2}')
-WORKING_PATH=`ssh acdc@$IP "echo $HOME/aaa_package"`
+WORKING_PATH=`ssh acdc@$IP 'echo $HOME/aaa_package'`
 
 # if IP is empty then stop program
 if [ -z "$IP" ]; then
     echo "Machine (IP) for packaging $PLATFORM_$ARCH is not set."
     echo "Please check your machine_config file."
-    exit 1
+    kill -s SIGUSR1 $$
 fi
 
 CONFIG_EDITOR=edit_${PLATFORM}_config.sh
@@ -34,13 +34,13 @@ ssh acdc@$IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --frontend $FRONTEND --back
 # If log contains "Error" then stop program
 if grep -q "Error" log; then
     echo "Error found in log"
-    exit 1
+    kill -s SIGUSR1 $$
 fi
 
 # Run packaging script
-ssh acdc@$IP "cd ${WORKING_PATH} && ./$PACK_SCRIPT" >> log
+ssh -t acdc@$IP "cd ${WORKING_PATH} && ./$PACK_SCRIPT" >> log
 
-# Make dmg_config default
+# Make config default
 ssh acdc@$IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --default" >> log
 
 # Extract Output file name in log and copy it to carta server
