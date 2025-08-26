@@ -38,18 +38,31 @@ if grep -q "Error" log; then
 fi
 
 # Run packaging script
-ssh -t acdc@$IP "cd ${WORKING_PATH} && ./$PACK_SCRIPT" >> log
+ssh acdc@$IP "cd ${WORKING_PATH} && ./$PACK_SCRIPT" >> log
 
 # Make config default
 ssh acdc@$IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --default" >> log
 
 # Extract Output file name in log and copy it to carta server
-OUTPUT_FILE=$(grep "Output file:" log | awk '{print $NF}')
+# use grep -a to treat binary as text, fallback to strings if necessary
+OUTPUT_FILE=$(grep -a "Output file:" log | awk '{print $NF}' | head -n1)
+if [ -z "$OUTPUT_FILE" ]; then
+    OUTPUT_FILE=$(strings log | grep "Output file:" | awk '{print $NF}' | head -n1)
+fi
+
+if [ -z "$OUTPUT_FILE" ]; then
+    echo "Failed to find Output file in log"
+    kill -s SIGUSR1 $$
+fi
+
 if [ "$PLATFORM" == "mac" ]; then
     OUTPUT_PATH="${WORKING_PATH}/pack/dist"
 elif [ "$PLATFORM" == "linux" ]; then
     OUTPUT_PATH="${WORKING_PATH}"
 fi
-scp acdc@$IP:$OUTPUT_PATH/${OUTPUT_FILE} /scratch/app-assembler-downloads
 
+# Copy the output file to the server downloads directory and log the operation
+scp acdc@$IP:"${OUTPUT_PATH}/${OUTPUT_FILE}" /scratch/app-assembler-downloads >> log 2>&1
+
+# Signal completion (or use this signal as your success indicator)
 kill -s SIGUSR1 $$
