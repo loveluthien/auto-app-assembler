@@ -130,7 +130,7 @@ function generateScript(platform, arch) {
     });
 }
 
-// $('#generate-button-linux-arm64').click(() => generateScript("linux", "arm64"));
+$('#generate-button-linux-arm64').click(() => generateScript("linux", "arm64"));
 $('#generate-button-linux-x64').click(() => generateScript("linux", "x64"));
 $('#generate-button-macos-arm64').click(() => generateScript("mac", "arm64"));
 $('#generate-button-macos-x64').click(() => generateScript("mac", "x64"));
