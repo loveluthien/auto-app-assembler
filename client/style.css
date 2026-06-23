@@ -79,6 +79,21 @@ body.light-theme {
   color: #003973;
 }
 
+.dark-theme .vertical-menu a {
+  background-color: #23272a;
+  color: #e0e0e0;
+}
+.dark-theme .vertical-menu a:hover {
+  background-color: #444;
+}
+.light-theme .vertical-menu a {
+  background-color: #eee;
+  color: #222;
+}
+.light-theme .vertical-menu a:hover {
+  background-color: #ccc;
+}
+
 .dark-theme #buildOverlay, .dark-theme #busyOverlay {
   background-color: rgba(0,0,0,0.7);
 }
