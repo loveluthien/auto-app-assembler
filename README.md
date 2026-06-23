@@ -8,7 +8,6 @@ Originally it queried Github to get the list of all current carta-frontend and c
 many additional API requests need to be made. However, Github imposes a limit of 60 API requests per hour. 
 Instead, we now use Github Webhooks to store any commits in a local list as soon as they are made.
 
-Some additional files are required on the machines that build and package the carta-backend. They have not been uploaded yet.
 If using NGINX and reverse proxy, it requires configuration blocks to be added to your NGINX configuration file.
 
 To run:
@@ -16,3 +15,5 @@ To run:
 npm install
 npm start
 ```
+
+The corresponding-packaging scripts need to be set up in machine you pointed in `server/machine_config`. 

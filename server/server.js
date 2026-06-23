@@ -108,10 +108,7 @@ app.post('/aaa/generate', (req, res) => {
     const platform = req.body.platform || 'linux'; // Default to linux if not provided
     const arch = req.body.arch || 'x64'; // Default to x64 if not provided
 
-    let script = 'create-carta.sh'
-    if (platform === 'mac' && arch === 'x64') {
-        script = 'create-carta-mac-x64.sh';
-    }
+    let script = 'create-carta.sh';
     
     logStream.write(`${time} ${userIP} ${script} ${platform} ${arch} ${frontendCommit} ${backendCommit}\n`);
 
