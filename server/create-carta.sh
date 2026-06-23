@@ -39,6 +39,10 @@ if [ "$PLATFORM" != "mac" ] && [ "$PLATFORM" != "linux" ]; then
     die "Invalid platform: $PLATFORM"
 fi
 
+if [ "$ARCH" != "x64" ] && [ "$ARCH" != "arm64" ]; then
+    die "Invalid architecture: $ARCH. Must be 'x64' or 'arm64'."
+fi
+
 if [ "$PLATFORM" == "mac" ]; then
     WORKING_PATH="/Users/acdc/aaa_package"
     BUILD_IP=$(lookup_ip "mac_${ARCH}")
@@ -63,13 +67,22 @@ elif [ "$PLATFORM" == "linux" ]; then
     PACK_IP=$(lookup_ip "${PLATFORM}_${ARCH}")
     WORKING_PATH=$(ssh acdc@$PACK_IP 'echo $HOME/aaa_package')
 
-    ssh acdc@$PACK_IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --frontend $FRONTEND --backend $BACKEND" > log
-    check_log_errors
-    ssh acdc@$PACK_IP "cd ${WORKING_PATH} && ./run_docker_package.sh" >> log
-    ssh acdc@$PACK_IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --default" >> log
+    if [ "$ARCH" == "x64" ]; then
+        
+        ssh acdc@$PACK_IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --frontend $FRONTEND --backend $BACKEND" > log
+        check_log_errors
+        ssh acdc@$PACK_IP "cd ${WORKING_PATH} && ./run_docker_package.sh" >> log
+        ssh acdc@$PACK_IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --default" >> log
 
-    OUTPUT_FILE=$(extract_output_file)
-    scp acdc@$PACK_IP:"${WORKING_PATH}/${OUTPUT_FILE}" $DOWNLOADS_DIR >> log 2>&1
+        OUTPUT_FILE=$(extract_output_file)
+        scp acdc@$PACK_IP:"${WORKING_PATH}/${OUTPUT_FILE}" $DOWNLOADS_DIR >> log 2>&1
+    else 
+        cd /home/acdc/carta-package/CARTA-AppImage-creator
+        ./$CONFIG_EDITOR --frontend $FRONTEND --backend $BACKEND > log
+        check_log_errors
+        ./run_docker_package.sh >> log
+        ./$CONFIG_EDITOR --default >> log
+    fi
 fi
 
 kill -s SIGUSR1 $$
