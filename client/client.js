@@ -82,12 +82,28 @@ async function sortBranches(data, branchContainerId, branchType) {
 }
 
 // Show the latest commits from the local .json files by default, plus reverse the order
-fetchCommits('carta-frontend').then(data => displayCommits(data.reverse(), 'frontend-branch', 'frontend-branch'));
-fetchCommits('carta-backend').then(data => displayCommits(data.reverse(), 'backend-branch', 'backend-branch'));
+function loadCommits() {
+    fetchCommits('carta-frontend').then(data => displayCommits(data.reverse(), 'frontend-branch', 'frontend-branch'));
+    fetchCommits('carta-backend').then(data => displayCommits(data.reverse(), 'backend-branch', 'backend-branch'));
+}
 
-// Button that will send the branch names to be built
+loadCommits();
+
 $(document).ready(function() {
 
+    $('#refresh-commits').click(function() {
+        const btn = $(this);
+        btn.prop('disabled', true).text('Refreshing...');
+        $.post('/refresh-commits', function() {
+            loadCommits();
+            btn.prop('disabled', false).text('Refresh Commits');
+        }).fail(function() {
+            alert('Failed to refresh commits');
+            btn.prop('disabled', false).text('Refresh Commits');
+        });
+    });
+
+// Button that will send the branch names to be built
     $.get('/aaa/getInitiatorState', (res) => {
         isProcessInitiator = res;
     });

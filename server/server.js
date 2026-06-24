@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const express = require('express');
 var cookieParser = require('cookie-parser')
 const morgan = require('morgan');
-// const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const app = express();
 const port = 5699;
 
@@ -13,8 +13,6 @@ app.use(cookieParser())
 app.get('/', function(req, res) {
     console.log('Cookies: ', req.cookies)
 });
-
-const { spawn } = require('child_process');
 
 const logStream = fs.createWriteStream('/tmp/app-assembler.log', {flags: 'a'});
 
@@ -142,6 +140,49 @@ app.get('/commits/:repo', (req, res) => {
     });
 });
 
+app.post('/refresh-commits', (req, res) => {
+    const fetchAndSave = (repo, fileName) => {
+        return new Promise((resolve, reject) => {
+            exec(`curl -s "https://api.github.com/repos/CARTAvis/${repo}/commits"`, (error, stdout, stderr) => {
+                if (error) {
+                    console.error(`Error fetching commits for ${repo}:`, error);
+                    return reject(error);
+                }
+                try {
+                    const commits = JSON.parse(stdout);
+                    if (!Array.isArray(commits)) {
+                        return reject(new Error('Invalid response from GitHub API'));
+                    }
+                    const fileContent = commits.map(c => {
+                        return JSON.stringify({
+                            branch: 'dev',
+                            shortId: c.sha.substring(0, 8),
+                            timestamp: c.commit.author.date
+                        });
+                    }).join('\n') + '\n';
+                    fs.writeFile(fileName, fileContent, (err) => {
+                        if (err) return reject(err);
+                        resolve();
+                    });
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        });
+    };
+
+    Promise.all([
+        fetchAndSave('carta-frontend', 'carta-frontend-commits.json'),
+        fetchAndSave('carta-backend', 'carta-backend-commits.json')
+    ])
+    .then(() => {
+        res.sendStatus(200);
+    })
+    .catch(err => {
+        console.error('Failed to refresh commits:', err);
+        res.status(500).send(err.toString());
+    });
+});
 
 let clients = [];
 
