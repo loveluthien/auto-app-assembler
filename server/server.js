@@ -19,17 +19,27 @@ const logStream = fs.createWriteStream('/tmp/app-assembler.log', {flags: 'a'});
 const session = require('express-session');
 
 app.use(session({
-    secret: '<token>',
+    secret: 'aaa-secret-key',
     resave: false,
     saveUninitialized: true,
-    store: new session.MemoryStore(),
-    cookie: {
-        sameSite: 'none',
-        secure: true, 
-    }
+    store: new session.MemoryStore()
 }));
 
+app.use((req, res, next) => {
+    const origin = req.headers.origin || '*';
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    res.header('Access-Control-Expose-Headers', 'Link');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
+
 app.use('/aaa', express.static('/var/www/aaa'))
+app.use(express.static(path.join(__dirname, '../client')));
 app.use(express.json({
     verify: (req, _res, buf) => { req.rawBody = buf; }
 }));
@@ -41,87 +51,11 @@ app.set('trust proxy', true);
 
 app.use(morgan('dev'));
 
-const WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET;
-
-function verifyGithubSignature(req) {
-    if (!WEBHOOK_SECRET) {
-        console.warn('GITHUB_WEBHOOK_SECRET is not set — skipping signature verification');
-        return true;
-    }
-    const signature = req.headers['x-hub-signature-256'];
-    if (!signature) return false;
-    const expected = 'sha256=' + crypto
-        .createHmac('sha256', WEBHOOK_SECRET)
-        .update(req.rawBody)
-        .digest('hex');
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-}
-
-function sanitizeRepoName(name) {
-    // Allow only alphanumeric, hyphens, underscores — no path separators or special chars
-    return /^[a-zA-Z0-9_-]+$/.test(name) ? name : null;
-}
-
-// use webhooks to detect commits to github and save to files
-app.post('/github-webhook-auto-app', (req, res) => {
-    if (!verifyGithubSignature(req)) {
-        console.warn('Webhook rejected: invalid or missing signature');
-        res.sendStatus(401);
-        return;
-    }
-
-    // GitHub can send either application/json or application/x-www-form-urlencoded.
-    // For the latter, the JSON payload arrives as a string in req.body.payload.
-    let body = req.body;
-    if (typeof req.body.payload === 'string') {
-        try {
-            body = JSON.parse(req.body.payload);
-        } catch (e) {
-            console.error('Failed to parse webhook payload:', e);
-            res.sendStatus(400);
-            return;
-        }
-    }
-
-    const githubEvent = req.headers['x-github-event'];
-    console.log(`Webhook received: event=${githubEvent}`, JSON.stringify(body).slice(0, 200));
-
-    if (body.commits && body.repository) {
-        const repoName = sanitizeRepoName(body.repository.name);
-        if (!repoName) {
-            console.error(`Webhook rejected: invalid repository name: ${body.repository.name}`);
-            res.sendStatus(400);
-            return;
-        }
-
-        const fileName = `${repoName}-commits.json`;
-        const latestCommit = body.commits[body.commits.length - 1];
-        const commitData = {
-            branch: body.ref.replace('refs/heads/', ''),
-            shortId: latestCommit.id.substring(0, 8),
-            timestamp: latestCommit.timestamp,
-        };
-
-        const newData = JSON.stringify(commitData) + '\n';
-        fs.appendFile(fileName, newData, err => {
-            if (err) {
-                console.error('Failed to append commit:', err);
-                res.sendStatus(500);
-                return;
-            }
-            console.log(`Appended new commit to ${fileName}`);
-            res.sendStatus(200);
-        });
-    } else {
-        console.log(`Webhook ignored: event=${githubEvent}, no commits/repository in payload`);
-        res.sendStatus(200);
-    }
-});
 
 app.get('/commits/:repo', (req, res) => {
     let fileName = `${req.params.repo}-commits.json`;
 
-    fs.readFile(fileName, (err, data) => {
+    fs.readFile(path.join(__dirname, fileName), (err, data) => {
         if(err) {
             console.error(err);
             res.sendStatus(500);
@@ -140,10 +74,16 @@ app.get('/commits/:repo', (req, res) => {
     });
 });
 
-app.post('/refresh-commits', (req, res) => {
+app.post('/refresh-commits/:repo', (req, res) => {
+    const repo = req.params.repo;
+    const branch = req.query.branch || 'dev';
+    if (repo !== 'carta-frontend' && repo !== 'carta-backend') {
+        return res.status(400).send('Invalid repository');
+    }
     const fetchAndSave = (repo, fileName) => {
         return new Promise((resolve, reject) => {
-            exec(`curl -s "https://api.github.com/repos/CARTAvis/${repo}/commits"`, (error, stdout, stderr) => {
+            const url = `https://api.github.com/repos/CARTAvis/${repo}/commits?sha=${encodeURIComponent(branch)}&per_page=30`;
+            exec(`curl -s "${url}"`, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
                 if (error) {
                     console.error(`Error fetching commits for ${repo}:`, error);
                     return reject(error);
@@ -155,12 +95,13 @@ app.post('/refresh-commits', (req, res) => {
                     }
                     const fileContent = commits.map(c => {
                         return JSON.stringify({
-                            branch: 'dev',
+                            branch: branch,
                             shortId: c.sha.substring(0, 8),
-                            timestamp: c.commit.author.date
+                            timestamp: c.commit.author.date,
+                            message: c.commit.message.split('\n')[0]
                         });
                     }).join('\n') + '\n';
-                    fs.writeFile(fileName, fileContent, (err) => {
+                    fs.writeFile(path.join(__dirname, fileName), fileContent, (err) => {
                         if (err) return reject(err);
                         resolve();
                     });
@@ -171,16 +112,75 @@ app.post('/refresh-commits', (req, res) => {
         });
     };
 
-    Promise.all([
-        fetchAndSave('carta-frontend', 'carta-frontend-commits.json'),
-        fetchAndSave('carta-backend', 'carta-backend-commits.json')
-    ])
+    fetchAndSave(repo, `${repo}-commits.json`)
     .then(() => {
         res.sendStatus(200);
     })
     .catch(err => {
         console.error('Failed to refresh commits:', err);
-        res.status(500).send(err.toString());
+        res.status(500).send(err.message);
+    });
+});
+
+app.post('/refresh-branches/:repo', (req, res) => {
+    const repo = req.params.repo;
+    if (repo !== 'carta-frontend' && repo !== 'carta-backend') {
+        return res.status(400).send('Invalid repository');
+    }
+    
+    function fetchAllBranches(repo) {
+        return new Promise((resolve, reject) => {
+            let allBranches = [];
+            function fetchPage(url) {
+                exec(`curl -s -i "${url}"`, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout) => {
+                    if (error) return reject(error);
+                    const splitIndex = stdout.indexOf('\r\n\r\n');
+                    if (splitIndex === -1) return reject(new Error('Invalid response'));
+                    const headers = stdout.substring(0, splitIndex);
+                    const body = stdout.substring(splitIndex + 4);
+                    let data;
+                    try { data = JSON.parse(body); } catch (e) { return reject(e); }
+                    if (!Array.isArray(data)) return reject(new Error('Invalid JSON response'));
+                    
+                    allBranches = allBranches.concat(data);
+                    
+                    const linkMatch = headers.match(/^link:\s*(.*)$/im);
+                    if (linkMatch) {
+                        const nextPageLink = linkMatch[1].split(',').find(link => link.includes('rel="next"'));
+                        if (nextPageLink) {
+                            const nextPageUrl = nextPageLink.split(';')[0].slice(1, -1);
+                            return fetchPage(nextPageUrl);
+                        }
+                    }
+                    resolve(allBranches);
+                });
+            }
+            fetchPage(`https://api.github.com/repos/CARTAvis/${repo}/branches?per_page=100`);
+        });
+    }
+
+    fetchAllBranches(repo).then(branches => {
+        fs.writeFile(path.join(__dirname, `${repo}-branch.json`), JSON.stringify(branches, null, 2), (err) => {
+            if (err) return res.status(500).send(err.message);
+            res.sendStatus(200);
+        });
+    }).catch(err => res.status(500).send(err.message));
+});
+
+app.get('/branches/:repo', (req, res) => {
+    const repo = req.params.repo;
+    if (repo !== 'carta-frontend' && repo !== 'carta-backend') {
+        return res.status(400).send('Invalid repository');
+    }
+    fs.readFile(path.join(__dirname, `${repo}-branch.json`), 'utf8', (err, data) => {
+        if (err) {
+            return res.json([]);
+        }
+        try {
+            res.json(JSON.parse(data));
+        } catch(e) {
+            res.json([]);
+        }
     });
 });
 
@@ -282,6 +282,33 @@ app.get('/downloads', (req, res) => {
         } else {
             res.json(files);
         }
+    });
+});
+
+app.get('/github-proxy', (req, res) => {
+    const targetUrl = req.query.url;
+    if (!targetUrl || !targetUrl.startsWith('https://api.github.com/')) {
+        return res.status(400).send('Invalid URL');
+    }
+    exec(`curl -s -i "${targetUrl}"`, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
+        if (error) return res.status(500).send(error.message);
+        
+        const splitIndex = stdout.indexOf('\r\n\r\n');
+        if (splitIndex === -1) {
+            res.setHeader('Content-Type', 'application/json');
+            return res.send(stdout);
+        }
+        
+        const headersPart = stdout.substring(0, splitIndex);
+        const bodyPart = stdout.substring(splitIndex + 4);
+        
+        const linkMatch = headersPart.match(/^link:\s*(.*)$/im);
+        if (linkMatch) {
+            res.setHeader('Link', linkMatch[1]);
+        }
+        
+        res.setHeader('Content-Type', 'application/json');
+        res.send(bodyPart);
     });
 });
 
