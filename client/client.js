@@ -1,7 +1,15 @@
+const SERVER_URL = window.location.protocol === 'file:' ? 'http://localhost:5699' : '';
+
+$.ajaxSetup({
+    xhrFields: {
+        withCredentials: true
+    }
+});
+
 // Display the contents of "carta-frontend-commits.json" and "carta-backend-commits.json" by default
 // These files are created by server.js and that uses webhooks to list every frontend and backend commit.
 async function fetchCommits(repo) {
-    const response = await fetch(`/commits/${repo}`);
+    const response = await fetch(`${SERVER_URL}/commits/${repo}`, { credentials: 'include' });
     const data = await response.json();
     return data;
 }
@@ -19,34 +27,16 @@ function displayCommits(data, selectId, commitType) {
         }
         const option = document.createElement('option');
         option.value = item.shortId;
-        option.text = `${item.branch}  ${datePart} ${timePart} (${item.shortId})`;
+        const msg = item.message ? ` - ${item.message}` : '';
+        option.text = `${datePart} (${item.shortId})${msg}`;
         select.appendChild(option);
     });
 }
 
 
-// Function to recursively fetch all pages of github branches
-async function getAllBranches(url) {
-    const response = await fetch(url);
+async function fetchBranchesFromDisk(repo) {
+    const response = await fetch(`${SERVER_URL}/branches/${repo}`, { credentials: 'include' });
     const data = await response.json();
-
-    // Check if there are more pages of branches
-    const linkHeader = response.headers.get('Link');
-    if (linkHeader) {
-        const nextPageLink = linkHeader.split(',').find(link => link.includes('rel="next"'));
-        if (nextPageLink) {
-            const nextPageUrl = nextPageLink.split(';')[0].slice(1, -1);
-            const nextPageData = await getAllBranches(nextPageUrl);
-            return data.concat(nextPageData);
-        }
-    }
-    return data;
-}
-
-async function fetchBranches(url) {
-    let data = await getAllBranches(url);
-    // remove 'archived' branches
-    data = data.filter(branch => !branch.name.startsWith('archived'));
     return data;
 }
 
@@ -54,14 +44,12 @@ function displayBranches(data, selectId, branchType) {
     const select = document.getElementById(selectId);
     select.innerHTML = '';
     data.forEach((item, i) => {
-        let datePart = '';
-        if (item.commit.date) {
-            const dateStr = item.commit.date.toISOString();
-            datePart = dateStr.split('T')[0];
-        }
         const option = document.createElement('option');
         option.value = item.commit.sha.substring(0, 8);
-        option.text = `${item.name}  ${datePart}  (${item.commit.sha.substring(0, 8)})`;
+        option.text = item.name;
+        if (item.name === 'dev') {
+            option.selected = true;
+        }
         select.appendChild(option);
     });
 }
@@ -81,30 +69,104 @@ async function sortBranches(data, branchContainerId, branchType) {
     displayBranches(data, branchContainerId, branchType);
 }
 
-// Show the latest commits from the local .json files by default, plus reverse the order
+// Show the latest commits from the local .json files by default
 function loadCommits() {
-    fetchCommits('carta-frontend').then(data => displayCommits(data.reverse(), 'frontend-branch', 'frontend-branch'));
-    fetchCommits('carta-backend').then(data => displayCommits(data.reverse(), 'backend-branch', 'backend-branch'));
+    fetchCommits('carta-frontend').then(data => displayCommits(data, 'frontend-branch', 'frontend-branch'));
+    fetchCommits('carta-backend').then(data => displayCommits(data, 'backend-branch', 'backend-branch'));
+}
+
+function loadBranches() {
+    fetchBranchesFromDisk('carta-frontend').then(data => displayBranches(data, 'frontend-branch-select', 'frontend'));
+    fetchBranchesFromDisk('carta-backend').then(data => displayBranches(data, 'backend-branch-select', 'backend'));
 }
 
 loadCommits();
+loadBranches();
 
 $(document).ready(function() {
 
-    $('#refresh-commits').click(function() {
+    $('.refresh-commit-btn').click(function() {
         const btn = $(this);
+        const repo = btn.data('repo');
+        const prefix = repo.replace('carta-', '');
+        
+        const branchSelect = $(`#${prefix}-branch-select`);
+        const selectedBranch = branchSelect.find('option:selected').text() || 'dev';
+        
         btn.prop('disabled', true).text('Refreshing...');
-        $.post('/refresh-commits', function() {
-            loadCommits();
+        $.post(`${SERVER_URL}/refresh-commits/${repo}?branch=${encodeURIComponent(selectedBranch)}`, function() {
+            fetchCommits(repo).then(data => displayCommits(data, `${prefix}-branch`, `${prefix}-branch`));
             btn.prop('disabled', false).text('Refresh Commits');
         }).fail(function() {
-            alert('Failed to refresh commits');
+            alert(`Failed to refresh commits for ${repo}`);
             btn.prop('disabled', false).text('Refresh Commits');
         });
     });
 
+    const branchRefreshCooldowns = {};
+    const isBranchRefreshingMap = {};
+
+    $('.refresh-branch-btn').click(function() {
+        const btn = $(this);
+        const repoKey = btn.data('repo'); // 'frontend' or 'backend'
+        const repo = `carta-${repoKey}`;
+        
+        if (isBranchRefreshingMap[repoKey] || branchRefreshCooldowns[repoKey]) return;
+        
+        btn.prop('disabled', true).text('Refreshing...');
+        isBranchRefreshingMap[repoKey] = true;
+
+        $.post(`${SERVER_URL}/refresh-branches/${repo}`, function() {
+            fetchBranchesFromDisk(repo).then(data => displayBranches(data, `${repoKey}-branch-select`, repoKey));
+            
+            isBranchRefreshingMap[repoKey] = false;
+            branchRefreshCooldowns[repoKey] = true;
+            
+            let timeLeft = 60;
+            btn.text(`Cooldown (${timeLeft}s)`);
+            const interval = setInterval(() => {
+                timeLeft--;
+                if (timeLeft <= 0) {
+                    clearInterval(interval);
+                    btn.prop('disabled', false).text('Refresh Branches');
+                    branchRefreshCooldowns[repoKey] = false;
+                } else {
+                    btn.text(`Cooldown (${timeLeft}s)`);
+                }
+            }, 1000);
+        }).fail(function() {
+            alert(`Failed to refresh branches for ${repo}`);
+            isBranchRefreshingMap[repoKey] = false;
+            btn.prop('disabled', false).text('Refresh Branches');
+        });
+    });
+
+    $('#frontend-branch-select').change(function() {
+        const branchName = $(this).find('option:selected').text().split(' ')[0];
+        const commitHash = $(this).val();
+        const commitSelect = $('#frontend-branch');
+        
+        if (commitSelect.find(`option[value="${commitHash}"]`).length === 0) {
+            const datePart = new Date().toISOString().split('T')[0];
+            commitSelect.prepend(`<option value="${commitHash}">${datePart} (${commitHash})</option>`);
+        }
+        commitSelect.val(commitHash);
+    });
+
+    $('#backend-branch-select').change(function() {
+        const branchName = $(this).find('option:selected').text().split(' ')[0];
+        const commitHash = $(this).val();
+        const commitSelect = $('#backend-branch');
+        
+        if (commitSelect.find(`option[value="${commitHash}"]`).length === 0) {
+            const datePart = new Date().toISOString().split('T')[0];
+            commitSelect.prepend(`<option value="${commitHash}">${datePart} (${commitHash})</option>`);
+        }
+        commitSelect.val(commitHash);
+    });
+
 // Button that will send the branch names to be built
-    $.get('/aaa/getInitiatorState', (res) => {
+    $.get(`${SERVER_URL}/aaa/getInitiatorState`, (res) => {
         isProcessInitiator = res;
     });
 
@@ -127,7 +189,7 @@ function generateScript(platform, arch) {
     console.log('Frontend branch:', frontendBranch, 'commit:', frontendCommit);
     console.log('Backend branch:', backendBranch, 'commit:', backendCommit);
     $('#buildOverlay').show();
-    $.post('/aaa/generate', {
+    $.post(`${SERVER_URL}/aaa/generate`, {
         platform,
         arch,
         frontendBranch,
@@ -151,7 +213,7 @@ $('#generate-button-linux-x64').click(() => generateScript("linux", "x64"));
 $('#generate-button-macos-arm64').click(() => generateScript("mac", "arm64"));
 $('#generate-button-macos-x64').click(() => generateScript("mac", "x64"));
 
-const eventSource = new EventSource('/events');
+const eventSource = new EventSource(`${SERVER_URL}/events`, { withCredentials: true });
 
    eventSource.onmessage = (event) => {
         console.log(`Received event: ${event.data}`); // debugging
@@ -182,7 +244,7 @@ const eventSource = new EventSource('/events');
 
 // Sort by date
 function updateFileList() {
-    $.get('/downloads', (files) => {
+    $.get(`${SERVER_URL}/downloads`, (files) => {
         const fileList = $('#file-list');
         fileList.empty();
 
@@ -198,7 +260,7 @@ function updateFileList() {
             });
 
         files.forEach((file) => {
-            fileList.append(`<li><a href="/downloads/${encodeURIComponent(file)}">${file}</a></li>`);
+            fileList.append(`<li><a href="${SERVER_URL}/downloads/${encodeURIComponent(file)}">${file}</a></li>`);
         });
     });
 }
