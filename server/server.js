@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const express = require('express');
 var cookieParser = require('cookie-parser')
 const morgan = require('morgan');
@@ -31,7 +32,9 @@ app.use(session({
 }));
 
 app.use('/aaa', express.static('/var/www/aaa'))
-app.use(express.json());
+app.use(express.json({
+    verify: (req, _res, buf) => { req.rawBody = buf; }
+}));
 app.use(express.urlencoded({ extended: true }));
 
 app.use('/downloads', express.static('/scratch/app-assembler-downloads'));
@@ -40,35 +43,81 @@ app.set('trust proxy', true);
 
 app.use(morgan('dev'));
 
-// use webhooks to detect commits to github and save to files
-app.post('/github-webhook-auto-app', (req, res) => {
-    console.log('Webhook received!', req.body);
+const WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET;
 
-if(req.body.commits && req.body.repository) {
-    let repoName = req.body.repository.name;
-    let fileName = `${repoName}-commits.json`;
-
-    let latestCommit = req.body.commits[req.body.commits.length - 1];
-    let commitData = {
-        branch: req.body.ref.replace('refs/heads/', ''),
-        shortId: latestCommit.id.substring(0, 8),
-        timestamp: latestCommit.timestamp,
-    };
-
-    let newData = JSON.stringify(commitData) + '\n';
-    fs.appendFile(fileName, newData, err => {
-        if(err) {
-            console.error(err);
-            res.sendStatus(500);
-            return;
-        }
-        console.log(`Appended new commit to ${fileName}`); 
-        res.sendStatus(200);
-    });
-} else {
-    res.sendStatus(200);
+function verifyGithubSignature(req) {
+    if (!WEBHOOK_SECRET) {
+        console.warn('GITHUB_WEBHOOK_SECRET is not set — skipping signature verification');
+        return true;
+    }
+    const signature = req.headers['x-hub-signature-256'];
+    if (!signature) return false;
+    const expected = 'sha256=' + crypto
+        .createHmac('sha256', WEBHOOK_SECRET)
+        .update(req.rawBody)
+        .digest('hex');
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
 }
 
+function sanitizeRepoName(name) {
+    // Allow only alphanumeric, hyphens, underscores — no path separators or special chars
+    return /^[a-zA-Z0-9_-]+$/.test(name) ? name : null;
+}
+
+// use webhooks to detect commits to github and save to files
+app.post('/github-webhook-auto-app', (req, res) => {
+    if (!verifyGithubSignature(req)) {
+        console.warn('Webhook rejected: invalid or missing signature');
+        res.sendStatus(401);
+        return;
+    }
+
+    // GitHub can send either application/json or application/x-www-form-urlencoded.
+    // For the latter, the JSON payload arrives as a string in req.body.payload.
+    let body = req.body;
+    if (typeof req.body.payload === 'string') {
+        try {
+            body = JSON.parse(req.body.payload);
+        } catch (e) {
+            console.error('Failed to parse webhook payload:', e);
+            res.sendStatus(400);
+            return;
+        }
+    }
+
+    const githubEvent = req.headers['x-github-event'];
+    console.log(`Webhook received: event=${githubEvent}`, JSON.stringify(body).slice(0, 200));
+
+    if (body.commits && body.repository) {
+        const repoName = sanitizeRepoName(body.repository.name);
+        if (!repoName) {
+            console.error(`Webhook rejected: invalid repository name: ${body.repository.name}`);
+            res.sendStatus(400);
+            return;
+        }
+
+        const fileName = `${repoName}-commits.json`;
+        const latestCommit = body.commits[body.commits.length - 1];
+        const commitData = {
+            branch: body.ref.replace('refs/heads/', ''),
+            shortId: latestCommit.id.substring(0, 8),
+            timestamp: latestCommit.timestamp,
+        };
+
+        const newData = JSON.stringify(commitData) + '\n';
+        fs.appendFile(fileName, newData, err => {
+            if (err) {
+                console.error('Failed to append commit:', err);
+                res.sendStatus(500);
+                return;
+            }
+            console.log(`Appended new commit to ${fileName}`);
+            res.sendStatus(200);
+        });
+    } else {
+        console.log(`Webhook ignored: event=${githubEvent}, no commits/repository in payload`);
+        res.sendStatus(200);
+    }
 });
 
 app.get('/commits/:repo', (req, res) => {
