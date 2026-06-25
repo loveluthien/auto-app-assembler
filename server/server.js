@@ -52,6 +52,8 @@ app.set('trust proxy', true);
 app.use(morgan('dev'));
 
 
+
+
 app.get('/commits/:repo', (req, res) => {
     let fileName = `${req.params.repo}-commits.json`;
 
@@ -63,14 +65,32 @@ app.get('/commits/:repo', (req, res) => {
         }
 
         let lines = data.toString().split('\n').filter(Boolean);
-//        let commits = lines.length ? lines.map(JSON.parse) : [];
         let commits = lines.length ? lines.map(line => {
             let commit = JSON.parse(line);
-            commit.timestamp = new Date(commit.timestamp);
+            if (commit.timestamp) {
+                commit.timestamp = new Date(commit.timestamp);
+            }
             return commit;
         }) : [];
 
         res.json(commits);
+    });
+});
+
+app.get('/branches/:repo', (req, res) => {
+    const repo = req.params.repo;
+    if (repo !== 'carta-frontend' && repo !== 'carta-backend') {
+        return res.status(400).send('Invalid repository');
+    }
+    fs.readFile(path.join(__dirname, `${repo}-branches.json`), 'utf8', (err, data) => {
+        if (err) {
+            return res.json([]);
+        }
+        try {
+            res.json(JSON.parse(data));
+        } catch(e) {
+            res.json([]);
+        }
     });
 });
 
@@ -160,28 +180,11 @@ app.post('/refresh-branches/:repo', (req, res) => {
     }
 
     fetchAllBranches(repo).then(branches => {
-        fs.writeFile(path.join(__dirname, `${repo}-branch.json`), JSON.stringify(branches, null, 2), (err) => {
+        fs.writeFile(path.join(__dirname, `${repo}-branches.json`), JSON.stringify(branches, null, 2), (err) => {
             if (err) return res.status(500).send(err.message);
             res.sendStatus(200);
         });
     }).catch(err => res.status(500).send(err.message));
-});
-
-app.get('/branches/:repo', (req, res) => {
-    const repo = req.params.repo;
-    if (repo !== 'carta-frontend' && repo !== 'carta-backend') {
-        return res.status(400).send('Invalid repository');
-    }
-    fs.readFile(path.join(__dirname, `${repo}-branch.json`), 'utf8', (err, data) => {
-        if (err) {
-            return res.json([]);
-        }
-        try {
-            res.json(JSON.parse(data));
-        } catch(e) {
-            res.json([]);
-        }
-    });
 });
 
 let clients = [];

@@ -1,15 +1,9 @@
-const SERVER_URL = window.location.protocol === 'file:' ? 'http://localhost:5699' : '';
 
-$.ajaxSetup({
-    xhrFields: {
-        withCredentials: true
-    }
-});
 
 // Display the contents of "carta-frontend-commits.json" and "carta-backend-commits.json" by default
 // These files are created by server.js and that uses webhooks to list every frontend and backend commit.
 async function fetchCommits(repo) {
-    const response = await fetch(`${SERVER_URL}/commits/${repo}`, { credentials: 'include' });
+    const response = await fetch(`/commits/${repo}`);
     const data = await response.json();
     return data;
 }
@@ -35,7 +29,7 @@ function displayCommits(data, selectId, commitType) {
 
 
 async function fetchBranchesFromDisk(repo) {
-    const response = await fetch(`${SERVER_URL}/branches/${repo}`, { credentials: 'include' });
+    const response = await fetch(`/branches/${repo}`);
     const data = await response.json();
     return data;
 }
@@ -94,7 +88,7 @@ $(document).ready(function() {
         const selectedBranch = branchSelect.find('option:selected').text() || 'dev';
         
         btn.prop('disabled', true).text('Refreshing...');
-        $.post(`${SERVER_URL}/refresh-commits/${repo}?branch=${encodeURIComponent(selectedBranch)}`, function() {
+        $.post(`/refresh-commits/${repo}?branch=${encodeURIComponent(selectedBranch)}`, function() {
             fetchCommits(repo).then(data => displayCommits(data, `${prefix}-branch`, `${prefix}-branch`));
             btn.prop('disabled', false).text('Refresh Commits');
         }).fail(function() {
@@ -116,7 +110,7 @@ $(document).ready(function() {
         btn.prop('disabled', true).text('Refreshing...');
         isBranchRefreshingMap[repoKey] = true;
 
-        $.post(`${SERVER_URL}/refresh-branches/${repo}`, function() {
+        $.post(`/refresh-branches/${repo}`, function() {
             fetchBranchesFromDisk(repo).then(data => displayBranches(data, `${repoKey}-branch-select`, repoKey));
             
             isBranchRefreshingMap[repoKey] = false;
@@ -166,7 +160,7 @@ $(document).ready(function() {
     });
 
 // Button that will send the branch names to be built
-    $.get(`${SERVER_URL}/aaa/getInitiatorState`, (res) => {
+    $.get(`/aaa/getInitiatorState`, (res) => {
         isProcessInitiator = res;
     });
 
@@ -189,7 +183,7 @@ function generateScript(platform, arch) {
     console.log('Frontend branch:', frontendBranch, 'commit:', frontendCommit);
     console.log('Backend branch:', backendBranch, 'commit:', backendCommit);
     $('#buildOverlay').show();
-    $.post(`${SERVER_URL}/aaa/generate`, {
+    $.post(`/aaa/generate`, {
         platform,
         arch,
         frontendBranch,
@@ -213,7 +207,7 @@ $('#generate-button-linux-x64').click(() => generateScript("linux", "x64"));
 $('#generate-button-macos-arm64').click(() => generateScript("mac", "arm64"));
 $('#generate-button-macos-x64').click(() => generateScript("mac", "x64"));
 
-const eventSource = new EventSource(`${SERVER_URL}/events`, { withCredentials: true });
+const eventSource = new EventSource(`/events`);
 
    eventSource.onmessage = (event) => {
         console.log(`Received event: ${event.data}`); // debugging
@@ -244,7 +238,7 @@ const eventSource = new EventSource(`${SERVER_URL}/events`, { withCredentials: t
 
 // Sort by date
 function updateFileList() {
-    $.get(`${SERVER_URL}/downloads`, (files) => {
+    $.get(`/downloads`, (files) => {
         const fileList = $('#file-list');
         fileList.empty();
 
@@ -260,7 +254,7 @@ function updateFileList() {
             });
 
         files.forEach((file) => {
-            fileList.append(`<li><a href="${SERVER_URL}/downloads/${encodeURIComponent(file)}">${file}</a></li>`);
+            fileList.append(`<li><a href="/downloads/${encodeURIComponent(file)}">${file}</a></li>`);
         });
     });
 }
