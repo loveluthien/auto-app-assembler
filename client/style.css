@@ -101,30 +101,7 @@ h2 {
   100% { transform: rotate(360deg); }
 }
 
-/* ─── Overlay ───────────────────────────────────────────────────────────────── */
 
-#buildOverlay,
-#busyOverlay {
-  display: none;
-  position: fixed;
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: 0;
-  background-color: rgba(0,0,0,0.5);
-  z-index: 2;
-  cursor: pointer;
-}
-
-#overlayText {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  font-size: 50px;
-  color: white;
-  transform: translate(-50%, -50%);
-  -ms-transform: translate(-50%, -50%);
-}
 
 /* ─── Dark theme ────────────────────────────────────────────────────────────── */
 
@@ -185,14 +162,6 @@ body.dark-theme {
   background-color: #444;
 }
 
-.dark-theme #buildOverlay,
-.dark-theme #busyOverlay {
-  background-color: rgba(0,0,0,0.7);
-}
-
-.dark-theme #overlayText {
-  color: #fff;
-}
 
 /* ─── Light theme ───────────────────────────────────────────────────────────── */
 
@@ -253,11 +222,3 @@ body.light-theme {
   background-color: #ccc;
 }
 
-.light-theme #buildOverlay,
-.light-theme #busyOverlay {
-  background-color: rgba(255,255,255,0.7);
-}
-
-.light-theme #overlayText {
-  color: #222;
-}

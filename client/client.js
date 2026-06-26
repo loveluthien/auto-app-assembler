@@ -23,6 +23,9 @@ function displayCommits(data, selectId, commitType) {
         option.value = item.shortId;
         const msg = item.message ? ` - ${item.message}` : '';
         option.text = `${datePart} (${item.shortId})${msg}`;
+        if (i === 0) {
+            option.selected = true;
+        }
         select.appendChild(option);
     });
 }
@@ -159,30 +162,73 @@ $(document).ready(function() {
         commitSelect.val(commitHash);
     });
 
-// Button that will send the branch names to be built
-    $.get(`/aaa/getInitiatorState`, (res) => {
-        isProcessInitiator = res;
-    });
+function updateQueueUI(activeJob, buildQueue) {
+    const allJobs = [activeJob, ...buildQueue].filter(Boolean);
+    
+    const queueList = document.getElementById('build-queue-list');
+    if (queueList) {
+        if (allJobs.length === 0) {
+            queueList.innerHTML = '<li style="color: #888;">No builds in progress or queued.</li>';
+        } else {
+            queueList.innerHTML = allJobs.map(job => {
+                const statusText = job.status === 'running' ? '<span style="color: #e0a800; font-weight: bold;">[Running]</span>' : '<span style="color: #17a2b8;">[Queued]</span>';
+                return `<li style="margin-bottom: 8px;">Assemble ${job.platform === 'mac' ? 'macOS' : 'Linux'} ${job.arch} ${statusText} <br><small style="color: #666;">fe: ${job.frontendBranch}, be: ${job.backendBranch}</small></li>`;
+            }).join('');
+        }
+    }
 
-  let isProcessInitiator = false;
+    const buttons = [
+        { id: 'generate-button-linux-arm64', platform: 'linux', arch: 'arm64' },
+        { id: 'generate-button-linux-x64', platform: 'linux', arch: 'x64' },
+        { id: 'generate-button-macos-arm64', platform: 'mac', arch: 'arm64' },
+        { id: 'generate-button-macos-x64', platform: 'mac', arch: 'x64' }
+    ];
+
+    buttons.forEach(b => {
+        const btnElem = document.getElementById(b.id);
+        if (!btnElem) return;
+        const matchingJob = allJobs.find(j => j.platform === b.platform && j.arch === b.arch);
+        const baseText = `Assemble ${b.platform === 'mac' ? 'macOS' : 'Linux'} ${b.arch}`;
+        if (matchingJob) {
+            btnElem.disabled = true;
+            btnElem.style.opacity = '0.5';
+            btnElem.style.cursor = 'not-allowed';
+            btnElem.textContent = `${baseText} (${matchingJob.status === 'running' ? 'Build...' : 'Queued'})`;
+        } else {
+            btnElem.disabled = false;
+            btnElem.style.opacity = '1';
+            btnElem.style.cursor = 'pointer';
+            btnElem.textContent = baseText;
+        }
+    });
+}
 
 function generateScript(platform, arch) {
-    console.log('Button clicked');
-    const frontendSelect = document.getElementById('frontend-branch');
-    const backendSelect = document.getElementById('backend-branch');
-    const frontendBranch = frontendSelect.options[frontendSelect.selectedIndex]?.text.split(' ')[0];
-    const backendBranch = backendSelect.options[backendSelect.selectedIndex]?.text.split(' ')[0];
-    const frontendCommit = frontendSelect.value;
-    const backendCommit = backendSelect.value;
-    // Make sure both branches are selected before clicking a button
-    if (!frontendBranch || !backendBranch) {
-        console.log('Both branches need to be selected first.');
+    const frontendBranchElem = document.getElementById('frontend-branch-select');
+    const backendBranchElem = document.getElementById('backend-branch-select');
+    const frontendCommitElem = document.getElementById('frontend-branch');
+    const backendCommitElem = document.getElementById('backend-branch');
+
+    const frontendBranch = frontendBranchElem?.options[frontendBranchElem.selectedIndex]?.text || 'dev';
+    const backendBranch = backendBranchElem?.options[backendBranchElem.selectedIndex]?.text || 'dev';
+    const frontendCommit = frontendCommitElem?.value;
+    const backendCommit = backendCommitElem?.value;
+
+    if (!frontendCommit || !backendCommit) {
+        alert('Please wait for commits to load or select a commit first.');
         return;
     }
-    isProcessInitiator = true;
-    console.log('Frontend branch:', frontendBranch, 'commit:', frontendCommit);
-    console.log('Backend branch:', backendBranch, 'commit:', backendCommit);
-    $('#buildOverlay').show();
+
+    const btnId = `generate-button-${platform === 'mac' ? 'macos' : 'linux'}-${arch}`;
+    const btnElem = document.getElementById(btnId);
+    if (btnElem) {
+        btnElem.disabled = true;
+        btnElem.style.opacity = '0.5';
+        btnElem.style.cursor = 'not-allowed';
+        const baseText = `Assemble ${platform === 'mac' ? 'macOS' : 'Linux'} ${arch}`;
+        btnElem.textContent = `${baseText} (Build...)`;
+    }
+
     $.post(`/aaa/generate`, {
         platform,
         arch,
@@ -193,12 +239,7 @@ function generateScript(platform, arch) {
     }, (res) => {
         console.log('Response:', res);
     }).fail(function(jqXHR, textStatus, errorThrown) {
-        if (jqXHR.status === 429) {
-            $('#buildOverlay').hide();
-            $('#busyOverlay').show();
-        } else {
-            console.log('Error in POST request:', textStatus, errorThrown);
-        }
+        alert(jqXHR.responseText || 'Error requesting build.');
     });
 }
 
@@ -209,32 +250,18 @@ $('#generate-button-macos-x64').click(() => generateScript("mac", "x64"));
 
 const eventSource = new EventSource(`/events`);
 
-   eventSource.onmessage = (event) => {
-        console.log(`Received event: ${event.data}`); // debugging
-        switch(event.data) {
-            case 'bashScriptStarted':
-                if (!isProcessInitiator) { // Show the busyOverlay to clients that did not initiate the build process
-                    $('#busyOverlay').show();
-                }
-                break;
-            case 'bashScriptFinished':
-                console.log('Hiding overlays');
-                $('#buildOverlay').hide();
-                $('#busyOverlay').hide();
-                updateFileList();  // Update the download list
-                isProcessInitiator = false;  // Reset the variable
-                break;
-            case 'otherUserScriptRunning':
-                if (!isProcessInitiator) {         // Show busyOverlay if client did not initiate the process
-                    $('#buildOverlay').hide();
-                    $('#busyOverlay').show();
-                }
-                break;
-            default:
-                console.log(`Unknown event: ${event.data}`);
-                break;
-        }
-    };
+eventSource.onmessage = (event) => {
+    if (event.data.startsWith('queueUpdate:')) {
+        try {
+            const data = JSON.parse(event.data.substring('queueUpdate:'.length));
+            updateQueueUI(data.activeJob, data.buildQueue);
+        } catch(e) {}
+        return;
+    }
+    if (event.data === 'bashScriptFinished') {
+        updateFileList();
+    }
+};
 
 // Sort by date
 function updateFileList() {
