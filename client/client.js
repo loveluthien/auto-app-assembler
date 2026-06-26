@@ -90,13 +90,13 @@ $(document).ready(function() {
         const branchSelect = $(`#${prefix}-branch-select`);
         const selectedBranch = branchSelect.find('option:selected').text() || 'dev';
         
-        btn.prop('disabled', true).text('Refreshing...');
+        btn.prop('disabled', true).text('Fetching...');
         $.post(`/refresh-commits/${repo}?branch=${encodeURIComponent(selectedBranch)}`, function() {
             fetchCommits(repo).then(data => displayCommits(data, `${prefix}-branch`, `${prefix}-branch`));
-            btn.prop('disabled', false).text('Refresh Commits');
+            btn.prop('disabled', false).text('Fetch Commits');
         }).fail(function() {
             alert(`Failed to refresh commits for ${repo}`);
-            btn.prop('disabled', false).text('Refresh Commits');
+            btn.prop('disabled', false).text('Fetch Commits');
         });
     });
 
@@ -110,7 +110,7 @@ $(document).ready(function() {
         
         if (isBranchRefreshingMap[repoKey] || branchRefreshCooldowns[repoKey]) return;
         
-        btn.prop('disabled', true).text('Refreshing...');
+        btn.prop('disabled', true).text('Fetching...');
         isBranchRefreshingMap[repoKey] = true;
 
         $.post(`/refresh-branches/${repo}`, function() {
@@ -125,7 +125,7 @@ $(document).ready(function() {
                 timeLeft--;
                 if (timeLeft <= 0) {
                     clearInterval(interval);
-                    btn.prop('disabled', false).text('Refresh Branches');
+                    btn.prop('disabled', false).text('Fetch Branches');
                     branchRefreshCooldowns[repoKey] = false;
                 } else {
                     btn.text(`Cooldown (${timeLeft}s)`);
@@ -134,7 +134,7 @@ $(document).ready(function() {
         }).fail(function() {
             alert(`Failed to refresh branches for ${repo}`);
             isBranchRefreshingMap[repoKey] = false;
-            btn.prop('disabled', false).text('Refresh Branches');
+            btn.prop('disabled', false).text('Fetch Branches');
         });
     });
 
