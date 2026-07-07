@@ -5,64 +5,97 @@ ARCH=$2
 FRONTEND=$3
 BACKEND=$4
 
-# Check platform
-if [ "$PLATFORM" != "mac" ] && [ "$PLATFORM" != "linux" ]; then
-    echo "Invalid platform: $PLATFORM"
-    exit 1
-fi
-
-if [ "$PLATFORM" == "mac" ]; then
-    PACK_SCRIPT="run_pack.sh"
-elif [ "$PLATFORM" == "linux" ]; then
-    PACK_SCRIPT="run_docker_package.sh"
-fi
-
-# Grep IP from machine_config. Notice that $2 in awk '{print $2}' is nothing to do with $ARCH
-IP=$(grep ${PLATFORM}_${ARCH} ./machine_config | awk '{print $2}')
-WORKING_PATH=`ssh acdc@$IP 'echo $HOME/aaa_package'`
-
-# if IP is empty then stop program
-if [ -z "$IP" ]; then
-    echo "Machine (IP) for packaging $PLATFORM_$ARCH is not set."
-    echo "Please check your machine_config file."
-    kill -s SIGUSR1 $$
-fi
-
+DOWNLOADS_DIR=/scratch/app-assembler-downloads
 CONFIG_EDITOR=edit_${PLATFORM}_config.sh
-ssh acdc@$IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --frontend $FRONTEND --backend $BACKEND" > log
 
-# If log contains "Error" then stop program
-if grep -q "Error" log; then
-    echo "Error found in log"
+die() {
+    echo "$1" >> log
     kill -s SIGUSR1 $$
+}
+
+lookup_ip() {
+    local label=$1
+    local ip
+    ip=$(grep "$label" ./machine_config | awk '{print $2}')
+    [ -z "$ip" ] && die "Machine (IP) for $label is not set. Please check your machine_config file."
+    echo "$ip"
+}
+
+check_log_errors() {
+    grep -q "Error" log && die "Error found in log"
+}
+
+output_file() {
+    local output_file
+
+    if [ "$PLATFORM" == "mac" ]; then
+        output_file=CARTA-${FRONTEND}-${BACKEND}
+        output_file="${output_file}-${ARCH}.dmg"
+    elif [ "$PLATFORM" == "linux" ]; then
+        output_file=carta-${FRONTEND}-${BACKEND}
+        local arch_name
+        if [ "$ARCH" == "x64" ]; then
+            arch_name="x86_64"
+        elif [ "$ARCH" == "arm64" ]; then
+            arch_name="aarch64"
+        fi
+        output_file="${output_file}-${arch_name}.AppImage"
+    fi
+
+    echo "$output_file"
+}
+
+if [ "$PLATFORM" != "mac" ] && [ "$PLATFORM" != "linux" ]; then
+    die "Invalid platform: $PLATFORM"
 fi
 
-# Run packaging script
-ssh acdc@$IP "cd ${WORKING_PATH} && ./$PACK_SCRIPT" >> log
-
-# Make config default
-ssh acdc@$IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --default" >> log
-
-# Extract Output file name in log and copy it to carta server
-# use grep -a to treat binary as text, fallback to strings if necessary
-OUTPUT_FILE=$(grep -a "Output file:" log | awk '{print $NF}' | head -n1)
-if [ -z "$OUTPUT_FILE" ]; then
-    OUTPUT_FILE=$(strings log | grep "Output file:" | awk '{print $NF}' | head -n1)
-fi
-
-if [ -z "$OUTPUT_FILE" ]; then
-    echo "Failed to find Output file in log"
-    kill -s SIGUSR1 $$
+if [ "$ARCH" != "x64" ] && [ "$ARCH" != "arm64" ]; then
+    die "Invalid architecture: $ARCH. Must be 'x64' or 'arm64'."
 fi
 
 if [ "$PLATFORM" == "mac" ]; then
-    OUTPUT_PATH="${WORKING_PATH}/pack/dist"
+    WORKING_PATH="/Users/acdc/aaa_package"
+    BUILD_IP=$(lookup_ip "mac_${ARCH}")
+    NOTARIZE_IP=$(lookup_ip "mac_notarize")
+
+    ssh acdc@$BUILD_IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --frontend $FRONTEND --backend $BACKEND" >> log
+    ssh acdc@$BUILD_IP "cd ${WORKING_PATH} && ./build_backend.sh" >> log
+    check_log_errors
+
+    ssh acdc@$NOTARIZE_IP "rm -rf ${WORKING_PATH}/carta-backend/build && mkdir -p ${WORKING_PATH}/carta-backend/build"
+    scp -rq acdc@$BUILD_IP:${WORKING_PATH}/carta-backend/build acdc@$NOTARIZE_IP:${WORKING_PATH}/carta-backend
+
+    ssh acdc@$NOTARIZE_IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --frontend $FRONTEND --backend $BACKEND --arch $ARCH --no_backend_build" >> log
+    ssh acdc@$NOTARIZE_IP "cd ${WORKING_PATH} && ./run_pack.sh" >> log
+    check_log_errors
+    ssh acdc@$NOTARIZE_IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --default" >> log
+    
+    OUTPUT_FILE=$(output_file)
+    scp acdc@$NOTARIZE_IP:${WORKING_PATH}/pack/dist/${OUTPUT_FILE} $DOWNLOADS_DIR
+
 elif [ "$PLATFORM" == "linux" ]; then
-    OUTPUT_PATH="${WORKING_PATH}"
+    OUTPUT_FILE=$(output_file)
+
+    if [ "$ARCH" == "x64" ]; then
+        PACK_IP=$(lookup_ip "${PLATFORM}_${ARCH}")
+        WORKING_PATH=$(ssh acdc@$PACK_IP 'echo $HOME/aaa_package')
+        
+        ssh acdc@$PACK_IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --frontend $FRONTEND --backend $BACKEND" >> log
+        check_log_errors
+        ssh acdc@$PACK_IP "cd ${WORKING_PATH} && ./run_docker_package.sh" >> log
+        ssh acdc@$PACK_IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --default" >> log
+
+        scp acdc@$PACK_IP:"${WORKING_PATH}/${OUTPUT_FILE}" $DOWNLOADS_DIR >> log 2>&1
+    else 
+        cd /home/acdc/aaa_package
+        ./$CONFIG_EDITOR --frontend $FRONTEND --backend $BACKEND > log
+        check_log_errors
+        ./run_docker_package.sh >> log
+        check_log_errors
+        ./$CONFIG_EDITOR --default >> log
+
+        cp ${OUTPUT_FILE} $DOWNLOADS_DIR >> log 2>&1
+    fi
 fi
 
-# Copy the output file to the server downloads directory and log the operation
-scp acdc@$IP:"${OUTPUT_PATH}/${OUTPUT_FILE}" /scratch/app-assembler-downloads >> log 2>&1
-
-# Signal completion (or use this signal as your success indicator)
 kill -s SIGUSR1 $$
