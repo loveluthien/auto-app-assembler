@@ -27,11 +27,12 @@ check_log_errors() {
 
 output_file() {
     local output_file
-    output_file=CARTA-${FRONTEND}-${BACKEND}
 
     if [ "$PLATFORM" == "mac" ]; then
+        output_file=CARTA-${FRONTEND}-${BACKEND}
         output_file="${output_file}-${ARCH}.dmg"
     elif [ "$PLATFORM" == "linux" ]; then
+        output_file=carta-${FRONTEND}-${BACKEND}
         local arch_name
         if [ "$ARCH" == "x64" ]; then
             arch_name="x86_64"
@@ -73,6 +74,8 @@ if [ "$PLATFORM" == "mac" ]; then
     scp acdc@$NOTARIZE_IP:${WORKING_PATH}/pack/dist/${OUTPUT_FILE} $DOWNLOADS_DIR
 
 elif [ "$PLATFORM" == "linux" ]; then
+    OUTPUT_FILE=$(output_file)
+
     if [ "$ARCH" == "x64" ]; then
         PACK_IP=$(lookup_ip "${PLATFORM}_${ARCH}")
         WORKING_PATH=$(ssh acdc@$PACK_IP 'echo $HOME/aaa_package')
@@ -81,17 +84,18 @@ elif [ "$PLATFORM" == "linux" ]; then
         check_log_errors
         ssh acdc@$PACK_IP "cd ${WORKING_PATH} && ./run_docker_package.sh" >> log
         ssh acdc@$PACK_IP "cd ${WORKING_PATH} && ./$CONFIG_EDITOR --default" >> log
+
+        scp acdc@$PACK_IP:"${WORKING_PATH}/${OUTPUT_FILE}" $DOWNLOADS_DIR >> log 2>&1
     else 
-        cd /home/acdc/carta-package/CARTA-AppImage-creator
+        cd /home/acdc/aaa_package
         ./$CONFIG_EDITOR --frontend $FRONTEND --backend $BACKEND > log
         check_log_errors
         ./run_docker_package.sh >> log
         check_log_errors
         ./$CONFIG_EDITOR --default >> log
-    fi
 
-    OUTPUT_FILE=$(output_file)
-    scp acdc@$PACK_IP:"${WORKING_PATH}/${OUTPUT_FILE}" $DOWNLOADS_DIR >> log 2>&1    
+        cp ${OUTPUT_FILE} $DOWNLOADS_DIR >> log 2>&1
+    fi
 fi
 
 kill -s SIGUSR1 $$
